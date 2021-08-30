@@ -14,50 +14,17 @@ import commonjs from '@rollup/plugin-commonjs';
 import resolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
 import OMT from '@surma/rollup-plugin-off-main-thread';
-import { importMetaAssets } from '@web/rollup-plugin-import-meta-assets';
-import dedent from 'dedent';
 import del from 'del';
 import { promises as fsp } from 'fs';
 import * as path from 'path';
 import { terser } from 'rollup-plugin-terser';
-import clientBundlePlugin from './lib/client-bundle-plugin';
-import dataURLPlugin from './lib/data-url-plugin';
-import emitFiles from './lib/emit-files-plugin';
-import entryDataPlugin, { fileNameToURL } from './lib/entry-data-plugin';
 import featurePlugin from './lib/feature-plugin';
 import nodeExternalPlugin from './lib/node-external-plugin';
 import resolveDirsPlugin from './lib/resolve-dirs-plugin';
 import simpleTS from './lib/simple-ts';
-import serviceWorkerPlugin from './lib/sw-plugin';
-import urlPlugin from './lib/url-plugin';
-
-function resolveFileUrl({ fileName }) {
-  return JSON.stringify(fileNameToURL(fileName));
-}
-
-function resolveImportMetaUrlInStaticBuild(property, { moduleId }) {
-  if (property !== 'url') return;
-  throw new Error(dedent`
-    Attempted to use a \`new URL(..., import.meta.url)\` pattern in ${path.relative(
-      process.cwd(),
-      moduleId
-    )} for URL that needs to end up in static HTML.
-    This is currently unsupported.
-  `);
-}
 
 const dir = '.tmp/build';
 const staticPath = 'static/c/[name]-[hash][extname]';
-const jsPath = staticPath.replace('[extname]', '.js');
-
-function jsFileName(chunkInfo) {
-  if (!chunkInfo.facadeModuleId) return jsPath;
-  const parsedPath = path.parse(chunkInfo.facadeModuleId);
-  if (parsedPath.name !== 'index') return jsPath;
-  // Come up with a better name than 'index'
-  const name = parsedPath.dir.split(/\\|\//).slice(-1);
-  return jsPath.replace('[name]', name);
-}
 
 export default async function ({ watch }) {
   const omtLoaderPromise = fsp.readFile(
@@ -81,18 +48,21 @@ export default async function ({ watch }) {
       'src/sw',
       'codecs',
     ]),
-    urlPlugin(),
-    dataURLPlugin(),
   ];
 
   return {
     input: 'src/client/index.ts',
-    output: {
-      dir,
-      format: 'cjs',
-      assetFileNames: staticPath,
-      exports: 'named',
-    },
+    external: ['worker_threads'],
+    output: [
+      {
+        dir,
+        format: 'esm',
+        assetFileNames: staticPath,
+        // This is needed because emscripten's workers use 'this', so they trigger all kinds of interop things,
+        // such as double-wrapping objects in { default }.
+        interop: false,
+      },
+    ],
     watch: {
       clearScreen: false,
       // Don't watch the ts files. Instead we watch the output from the ts compiler.
@@ -102,44 +72,16 @@ export default async function ({ watch }) {
       // although we may need to change this number over time.
       buildDelay: 250,
     },
-    preserveModules: true,
     plugins: [
-      { resolveFileUrl, resolveImportMeta: resolveImportMetaUrlInStaticBuild },
-      clientBundlePlugin(
-        {
-          external: ['worker_threads'],
-          plugins: [
-            { resolveFileUrl },
-            OMT({ loader: await omtLoaderPromise }),
-            importMetaAssets(),
-            serviceWorkerPlugin({
-              output: 'static/serviceworker.js',
-            }),
-            ...commonPlugins(),
-            commonjs(),
-            resolve(),
-            replace({ __PRERENDER__: false, __PRODUCTION__: isProduction }),
-            entryDataPlugin(),
-            isProduction ? terser({ module: true }) : {},
-          ],
-          preserveEntrySignatures: false,
-        },
-        {
-          dir,
-          format: 'amd',
-          chunkFileNames: jsFileName,
-          entryFileNames: jsFileName,
-          // This is needed because emscripten's workers use 'this', so they trigger all kinds of interop things,
-          // such as double-wrapping objects in { default }.
-          interop: false,
-        },
-        resolveFileUrl
-      ),
+      OMT({ loader: await omtLoaderPromise }),
       ...commonPlugins(),
-      emitFiles({ include: '**/*', root: path.join(__dirname, 'src', 'copy') }),
+      commonjs(),
+      resolve(),
+      replace({ __PRERENDER__: false, __PRODUCTION__: isProduction }),
+      isProduction ? terser({ module: true }) : {},
+      ...commonPlugins(),
       nodeExternalPlugin(),
       featurePlugin(),
-      replace({ __PRERENDER__: true, __PRODUCTION__: isProduction }),
     ],
   };
 }
