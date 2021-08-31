@@ -4,8 +4,6 @@ Squoosh-Web is a library that enables developers to access the powerful image co
 
 # API & CLI
 
-Squoosh has [an API](https://github.com/GoogleChromeLabs/squoosh/tree/dev/libsquoosh) and [a CLI](https://github.com/GoogleChromeLabs/squoosh/tree/dev/cli) to compress many images at once.
-
 # Developing
 
 To develop for Squoosh:

@@ -3,6 +3,7 @@ node_modules
 *.scss.d.ts
 *.css.d.ts
 build
+lib
 *.o
 .DS_Store
 

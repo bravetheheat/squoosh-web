@@ -10,7 +10,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import wasmUrl from 'url:codecs/rotate/rotate.wasm';
+
+// @ts-ignore TODO: Fix typing
+import rotateWasm from 'codecs/rotate/rotate.wasm';
 import { Options } from '../shared/meta';
 
 export interface RotateModuleInstance {
@@ -20,26 +22,18 @@ export interface RotateModuleInstance {
   };
 }
 
-// We are loading a 500B module here. Loading the code to feature-detect
-// `instantiateStreaming` probably takes longer to load than the time we save by
-// using `instantiateStreaming` in the first place. So let’s just use
-// `ArrayBuffer`s here.
-const instancePromise = fetch(wasmUrl)
-  .then((r) => r.arrayBuffer())
-  .then((buf) => WebAssembly.instantiate(buf));
-
 export default async function rotate(
   data: ImageData,
-  opts: Options,
+  opts: Options
 ): Promise<ImageData> {
-  const instance = (await instancePromise).instance as RotateModuleInstance;
+  const instance = rotateWasm() as RotateModuleInstance;
 
   // Number of wasm memory pages (á 64KiB) needed to store the image twice.
   const bytesPerImage = data.width * data.height * 4;
   const numPagesNeeded = Math.ceil((bytesPerImage * 2 + 8) / (64 * 1024));
   // Only count full pages, just to be safe.
   const numPagesAvailable = Math.floor(
-    instance.exports.memory.buffer.byteLength / (64 * 1024),
+    instance.exports.memory.buffer.byteLength / (64 * 1024)
   );
   const additionalPagesToAllocate = numPagesNeeded - numPagesAvailable;
 
@@ -55,6 +49,6 @@ export default async function rotate(
   return new ImageData(
     view.slice(bytesPerImage + 8, bytesPerImage * 2 + 8),
     flipDimensions ? data.height : data.width,
-    flipDimensions ? data.width : data.height,
+    flipDimensions ? data.width : data.height
   );
 }

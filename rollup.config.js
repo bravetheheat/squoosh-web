@@ -18,21 +18,22 @@ import del from 'del';
 import { promises as fsp } from 'fs';
 import * as path from 'path';
 import { terser } from 'rollup-plugin-terser';
-import featurePlugin from './lib/feature-plugin';
-import nodeExternalPlugin from './lib/node-external-plugin';
-import resolveDirsPlugin from './lib/resolve-dirs-plugin';
-import simpleTS from './lib/simple-ts';
+import featurePlugin from './rollup/feature-plugin';
+import nodeExternalPlugin from './rollup/node-external-plugin';
+import resolveDirsPlugin from './rollup/resolve-dirs-plugin';
+import simpleTS from './rollup/simple-ts';
+import { wasm } from '@rollup/plugin-wasm';
+import { importMetaAssets } from '@web/rollup-plugin-import-meta-assets';
 
-const dir = '.tmp/build';
 const staticPath = 'static/c/[name]-[hash][extname]';
 
 export default async function ({ watch }) {
   const omtLoaderPromise = fsp.readFile(
-    path.join(__dirname, 'lib', 'omt.ejs'),
+    path.join(__dirname, 'rollup', 'omt.ejs'),
     'utf-8'
   );
 
-  await del('.tmp/build');
+  await del('lib');
 
   const isProduction = !watch;
 
@@ -55,8 +56,8 @@ export default async function ({ watch }) {
     external: ['worker_threads'],
     output: [
       {
-        dir,
-        format: 'esm',
+        dir: 'lib',
+        format: 'amd',
         assetFileNames: staticPath,
         // This is needed because emscripten's workers use 'this', so they trigger all kinds of interop things,
         // such as double-wrapping objects in { default }.
@@ -74,12 +75,14 @@ export default async function ({ watch }) {
     },
     plugins: [
       OMT({ loader: await omtLoaderPromise }),
+      wasm({ sync: ['codecs/rotate/rotate.wasm'] }),
       ...commonPlugins(),
       commonjs(),
       resolve(),
       replace({ __PRERENDER__: false, __PRODUCTION__: isProduction }),
       isProduction ? terser({ module: true }) : {},
       ...commonPlugins(),
+      importMetaAssets(),
       nodeExternalPlugin(),
       featurePlugin(),
     ],
