@@ -26,7 +26,7 @@ class WorkerBridge {
   }
 
   protected _startWorker() {
-    this._worker = new Worker(workerURL);
+    this._worker = new Worker(`./squoosh-web/${workerURL}`);
     this._workerApi = wrap<ProcessorWorkerApi>(this._worker);
   }
 }

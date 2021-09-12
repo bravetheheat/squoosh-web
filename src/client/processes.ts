@@ -127,7 +127,7 @@ async function convertImage(
     processor: ProcessorState;
     encoder: EncoderState;
   }
-) {
+): Promise<File> {
   const abortController = new AbortController();
   const signal = abortController.signal;
 

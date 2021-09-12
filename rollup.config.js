@@ -33,7 +33,7 @@ export default async function ({ watch }) {
     'utf-8'
   );
 
-  await del('lib');
+  await del('build');
 
   const isProduction = !watch;
 
@@ -56,7 +56,7 @@ export default async function ({ watch }) {
     external: ['worker_threads'],
     output: [
       {
-        dir: 'lib',
+        dir: 'build',
         format: 'amd',
         assetFileNames: staticPath,
         // This is needed because emscripten's workers use 'this', so they trigger all kinds of interop things,
@@ -81,7 +81,7 @@ export default async function ({ watch }) {
       resolve(),
       replace({ __PRERENDER__: false, __PRODUCTION__: isProduction }),
       isProduction ? terser({ module: true }) : {},
-      ...commonPlugins(),
+
       importMetaAssets(),
       nodeExternalPlugin(),
       featurePlugin(),
